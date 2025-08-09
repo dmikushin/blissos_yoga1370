@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  kernel-builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: blissos-kernel-builder
+    volumes:
+      # Mount kernel source (will be cloned if not exists)
+      - ./kernel-source-xanmod:/kernel-source
+      # Mount build output directory
+      - ./kernel-build-xanmod:/kernel-build
+      # Mount BlissOS kernel config
+      - ./kernel.config:/config/kernel.config:ro
+      # Mount our Broadcom driver with fixes
+      - ./drivers:/drivers:ro
+      # Cache for faster rebuilds
+      - kernel-cache:/root/.cache
+    environment:
+      # Kernel version
+      - KERNEL_VERSION=6.9.9
+      - KERNEL_LOCALVERSION=-zenith
+      # Build settings
+      - KBUILD_BUILD_USER=jack
+      - KBUILD_BUILD_HOST=orion
+      # Parallel jobs
+      - JOBS=8
+    command: |
+      bash -c "
+        # Clone kernel source if not exists
+        if [ ! -f /kernel-source/Makefile ]; then
+          echo '=== Downloading Linux kernel 6.9.9 ==='
+          cd /tmp
+          git clone --depth 1 --branch v6.9.9 https://github.com/torvalds/linux.git kernel-tmp
+          
+          # Copy to mounted volume
+          cp -r kernel-tmp/* /kernel-source/ 2>/dev/null || {
+            echo 'Cannot write to /kernel-source. Creating it on host...'
+            exit 1
+          }
+          echo '=== Kernel source downloaded ==='
+        else
+          echo '=== Using existing kernel source ==='
+        fi
+        
+        # Copy our broadcom-wl driver to kernel source
+        echo '=== Installing Broadcom BCM4352 driver ==='
+        mkdir -p /kernel-source/drivers/net/wireless/
+        cp -r /drivers/broadcom-wl /kernel-source/drivers/net/wireless/
+        
+        # Add driver to Kconfig and Makefile if not already added
+        if ! grep -q 'source \"drivers/net/wireless/broadcom-wl/Kconfig\"' /kernel-source/drivers/net/wireless/Kconfig 2>/dev/null; then
+          echo 'source \"drivers/net/wireless/broadcom-wl/Kconfig\"' >> /kernel-source/drivers/net/wireless/Kconfig
+        fi
+        if ! grep -q 'obj-\$(CONFIG_WL)' /kernel-source/drivers/net/wireless/Makefile 2>/dev/null; then
+          echo 'obj-\$(CONFIG_WL) += broadcom-wl/' >> /kernel-source/drivers/net/wireless/Makefile
+        fi
+        
+        # Run build script
+        /usr/local/bin/build-kernel.sh
+      "
+    networks:
+      - build-network
+
+  # Optional: source downloader service
+  source-downloader:
+    image: alpine/git:latest
+    container_name: kernel-source-downloader
+    volumes:
+      - ./kernel-source-xanmod:/source
+    command: |
+      sh -c "
+        if [ ! -f /source/Makefile ]; then
+          echo 'Cloning kernel source v6.9.9...'
+          git clone --depth 1 --branch v6.9.9 https://github.com/torvalds/linux.git /tmp/linux
+          cp -r /tmp/linux/* /source/
+          echo 'Source download complete'
+        else
+          echo 'Source already exists'
+        fi
+      "
+    networks:
+      - build-network
+    profiles:
+      - download
+
+volumes:
+  kernel-cache:
+    driver: local
+
+networks:
+  build-network:
+    driver: bridge

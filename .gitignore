@@ -1,0 +1,42 @@
+# Kernel source (downloaded automatically)
+kernel-source-xanmod/
+kernel-source/
+
+# Build artifacts
+kernel-build-xanmod/
+kernel-build/
+*.o
+*.ko
+*.mod
+*.mod.c
+*.cmd
+.tmp_versions/
+Module.symvers
+modules.order
+
+# System images and extracted files
+system_*/
+system.efs
+system.img
+initrd_check/
+new_system/
+
+# Docker volumes
+kernel-cache/
+
+# Temporary files
+*.tmp
+*.log
+*.swp
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Other large files
+*.tar.gz
+*.tar.xz
+*.iso
+*.img
+!lib/*.o_shipped
