@@ -1,0 +1,12 @@
+config WL
+	tristate "Broadcom IEEE802.11 (wl) driver"
+	depends on PCI && CFG80211
+	select WEXT_PRIV
+	help
+	  This is the proprietary Broadcom driver for BCM4311, BCM4312,
+	  BCM4313, BCM4321, BCM4322, BCM43142, BCM43224, BCM43225,
+	  BCM43227, BCM43228, BCM4331, BCM4352, BCM4360 wireless cards.
+
+	  Say M to build this driver as a module.
+
+	  If unsure, say N.

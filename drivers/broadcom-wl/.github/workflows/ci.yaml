@@ -1,0 +1,109 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ patch-linux4.7 ]
+  pull_request:
+    branches: [ patch-linux4.7 ]
+
+permissions: {}
+
+jobs:
+
+  build:
+    name: Build Kernel Module
+    # Linux runners do not currently support nested virtualization (KVM)
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - kernel: '5.19'
+          os: f37
+        - kernel: '6.0'
+          os: f38
+        - kernel: '6.1'
+          os: f38
+        - kernel: '6.2'
+          os: f39
+        - kernel: '6.3'
+          os: f39
+        - kernel: '6.4'
+          os: f39
+        - kernel: '6.5'
+          os: f39
+        - kernel: '6.6'
+          os: f39
+        - kernel: '6.7'
+          os: f39
+
+    steps:
+    - name: Get QEMU image info
+      id: image
+      # The outputs of this step are solely used for generating a cache key.
+      # The fedora-qemu-img-info Action is also used from within the
+      # kernel-devel-vm Action to generate the Lima instance config. It is
+      # expected, but not guaranteed, that both invocations will return the
+      # same image checksum. For instance, not all mirrors synchronize at the
+      # same frequency, so different image versions may be found in different
+      # mirrors for a given OS version, especially shortly after a new release
+      # occurs upstream.
+      uses: antoineco/fedora-qemu-img-info-action@v1
+      with:
+        os: ${{ matrix.os }}
+
+    - name: Lima image cache
+      uses: actions/cache@v4
+      with:
+        path: ~/Library/Caches/lima/download
+        key: ${{ github.job }}-${{ runner.os }}-lima-${{ matrix.os }}-${{ steps.image.outputs.sha256sum }}
+
+    # https://github.blog/changelog/2023-02-23-hardware-accelerated-android-virtualization-on-actions-windows-and-linux-larger-hosted-runners/
+    # https://github.blog/2024-01-17-github-hosted-runners-double-the-power-for-open-source/
+    - name: Enable KVM group perms
+      run: |
+        sudo sh -c 'echo '"'"'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"'"'"' >/etc/udev/rules.d/99-kvm4all.rules'
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
+
+    - name: Install QEMU
+      run: sudo apt install -y qemu-system
+
+    - name: Install Lima
+      env:
+        LIMA_VERSION: 0.20.1
+        LIMA_SHA256SUM: e7093ca1889d2dab436d9f0e6b53d65336f75cf8ebd54f583085eca462a1fc4b
+      run: |
+        tmp_dir="$(mktemp -d)"
+        curl -L -o "$tmp_dir"/lima.tgz "https://github.com/lima-vm/lima/releases/download/v${LIMA_VERSION}/lima-${LIMA_VERSION}-Linux-x86_64.tar.gz"
+        echo -n "${LIMA_SHA256SUM}  ${tmp_dir}/lima.tgz" | sha256sum -c -
+        sudo tar -C /usr/local -xzf "$tmp_dir"/lima.tgz
+        rm -rf "$tmp_dir"
+        which limactl
+        limactl --version
+
+    - uses: actions/checkout@v4
+
+    - name: Bootstrap Lima instance
+      id: builder
+      uses: antoineco/kernel-devel-vm-action@v1
+      with:
+        kernel: ${{ matrix.kernel }}
+        os: ${{ matrix.os }}
+
+    - name: Build wl module
+      run: |
+        lima make
+        lima make clean
+
+    - name: Collect cloud-init logs from Lima instance
+      if: failure() && steps.builder.outcome != 'skipped' && env.LIMA_INSTANCE
+      run: mv -v ${{ steps.builder.outputs.logs }}/cloud-*.log ~/.lima/${{ env.LIMA_INSTANCE }}/
+
+    - name: Upload Lima instance logs
+      if: failure() && steps.builder.outcome != 'skipped' && env.LIMA_INSTANCE
+      uses: actions/upload-artifact@v4
+      with:
+        name: lima-logs-${{ matrix.kernel }}
+        path: ~/.lima/${{ env.LIMA_INSTANCE }}/*.log
