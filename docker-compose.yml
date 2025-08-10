@@ -32,7 +32,7 @@ services:
         if [ ! -f /kernel-source/Makefile ]; then
           echo '=== Downloading Linux kernel 6.9.9 ==='
           cd /tmp
-          git clone --depth 1 --branch v6.9.9 https://github.com/torvalds/linux.git kernel-tmp
+          git clone --depth 1 --branch 6.9_xanmod https://github.com/android-generic/kernel-zenith.git kernel-tmp
           
           # Copy to mounted volume
           cp -r kernel-tmp/* /kernel-source/ 2>/dev/null || {
@@ -73,7 +73,7 @@ services:
       sh -c "
         if [ ! -f /source/Makefile ]; then
           echo 'Cloning kernel source v6.9.9...'
-          git clone --depth 1 --branch v6.9.9 https://github.com/torvalds/linux.git /tmp/linux
+          git clone --depth 1 --branch 6.9_xanmod https://github.com/android-generic/kernel-zenith.git /tmp/linux
           cp -r /tmp/linux/* /source/
           echo 'Source download complete'
         else
