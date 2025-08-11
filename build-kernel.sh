@@ -111,29 +111,35 @@ fi
 
 # Check if vmlinux contains BCM4352 driver symbols
 if [ -f "/kernel-build/vmlinux" ]; then
-    echo -n "Checking vmlinux for BCM4352 symbols... "
-    BCM_SYMBOLS=$(nm /kernel-build/vmlinux 2>/dev/null | grep -E "wl_linux_|wl_cfg80211_|bcm_" | wc -l)
+    echo -n "Checking vmlinux for broadcom-wl specific symbols... "
+    # Look for symbols specific to the broadcom-wl driver:
+    # wl_pci_probe, wl_attach, wl_module_init, wl_ioctl, wl_cfg80211_* functions
+    BCM_SYMBOLS=$(nm /kernel-build/vmlinux 2>/dev/null | grep -E " [tT] (wl_pci_probe|wl_attach|wl_module_init|wl_ioctl|wl_cfg80211_attach|wl_cfg80211_detach|wl_open|wl_close|wl_start|wl_free)" | wc -l)
     if [ "$BCM_SYMBOLS" -gt 0 ]; then
         echo "✓ FOUND ($BCM_SYMBOLS symbols)"
-        echo "Sample BCM4352 functions in vmlinux:"
-        nm /kernel-build/vmlinux 2>/dev/null | grep -E "wl_linux_|wl_cfg80211_|bcm_" | head -5 | sed 's/^/  /'
+        echo "Sample broadcom-wl driver functions in vmlinux:"
+        nm /kernel-build/vmlinux 2>/dev/null | grep -E " [tT] (wl_pci_probe|wl_attach|wl_module_init|wl_ioctl|wl_cfg80211_attach|wl_cfg80211_detach|wl_open|wl_close|wl_start|wl_free)" | head -5 | sed 's/^/  /'
     else
         echo "✗ NOT FOUND"
-        echo "WARNING: BCM4352 driver symbols not found in vmlinux!"
+        echo "WARNING: broadcom-wl driver symbols not found in vmlinux!"
+        echo "Looking for any 'wl_' symbols as fallback:"
+        nm /kernel-build/vmlinux 2>/dev/null | grep " [tT] wl_" | head -5 | sed 's/^/  /'
     fi
 else
     echo "Warning: vmlinux not found, skipping symbol check"
 fi
 
-# Check if System.map contains BCM4352 symbols
+# Check if System.map contains broadcom-wl symbols
 if [ -f "/kernel-build/System.map" ]; then
-    echo -n "Checking System.map for BCM4352 symbols... "
-    MAP_SYMBOLS=$(grep -E "wl_linux_|wl_cfg80211_|bcm_" /kernel-build/System.map 2>/dev/null | wc -l)
+    echo -n "Checking System.map for broadcom-wl symbols... "
+    MAP_SYMBOLS=$(grep -E " [tT] (wl_pci_probe|wl_attach|wl_module_init|wl_ioctl|wl_cfg80211_attach|wl_cfg80211_detach|wl_open|wl_close|wl_start|wl_free)" /kernel-build/System.map 2>/dev/null | wc -l)
     if [ "$MAP_SYMBOLS" -gt 0 ]; then
         echo "✓ FOUND ($MAP_SYMBOLS symbols)"
-        grep -E "wl_linux_|wl_cfg80211_|bcm_" /kernel-build/System.map 2>/dev/null | head -5 | sed 's/^/  /'
+        grep -E " [tT] (wl_pci_probe|wl_attach|wl_module_init|wl_ioctl|wl_cfg80211_attach|wl_cfg80211_detach|wl_open|wl_close|wl_start|wl_free)" /kernel-build/System.map 2>/dev/null | head -5 | sed 's/^/  /'
     else
         echo "✗ NOT FOUND"
+        echo "Checking for any wl_ symbols:"
+        grep " [tT] wl_" /kernel-build/System.map 2>/dev/null | head -5 | sed 's/^/  /' || echo "  No wl_ symbols found at all!"
     fi
 fi
 
