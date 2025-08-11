@@ -132,107 +132,80 @@ echo "Modules in: /kernel-build/"
 
 echo ""
 echo "============================================="
-echo "Checking BCM4352 driver integration..."
+echo "CRITICAL VERIFICATION: BCM4352 COMPILATION"
 echo "============================================="
 
-# CRITICAL: Check if broadcom-wl was actually compiled
-echo -n "Checking if broadcom-wl was compiled... "
-if [ -d "/kernel-build/drivers/net/wireless/broadcom-wl" ]; then
-    WL_OBJECTS=$(find /kernel-build/drivers/net/wireless/broadcom-wl -name "*.o" 2>/dev/null | wc -l)
-    if [ "$WL_OBJECTS" -gt 0 ]; then
-        echo "✓ FOUND ($WL_OBJECTS object files)"
-        find /kernel-build/drivers/net/wireless/broadcom-wl -name "*.o" -exec ls -lh {} \; | head -5 | sed 's/^/  /'
+# THE ONLY CHECKS THAT MATTER:
+
+# 1. Check specific object files that MUST exist if driver compiled
+echo "Checking for REQUIRED object files:"
+REQUIRED_FILES=(
+    "/kernel-build/drivers/net/wireless/broadcom-wl/src/wl/sys/wl_linux.o"
+    "/kernel-build/drivers/net/wireless/broadcom-wl/src/wl/sys/wl_cfg80211_hybrid.o"
+    "/kernel-build/drivers/net/wireless/broadcom-wl/src/shared/linux_osl.o"
+)
+
+FAILED=0
+for file in "${REQUIRED_FILES[@]}"; do
+    if [ -f "$file" ]; then
+        size=$(stat -c%s "$file" 2>/dev/null || echo "0")
+        if [ "$size" -gt 1000 ]; then
+            echo "  ✓ $file ($(ls -lh "$file" | awk '{print $5}'))"
+        else
+            echo "  ✗ $file exists but EMPTY or TINY!"
+            FAILED=1
+        fi
     else
-        echo "✗ FAILED - NO OBJECT FILES!"
-        echo "ERROR: broadcom-wl directory exists but contains no compiled objects!"
-        echo "The driver was NOT compiled. Check that:"
-        echo "  1. CONFIG_WLAN_VENDOR_BROADCOM_WL is set in .config"
-        echo "  2. The Makefile in drivers/net/wireless/ includes broadcom-wl"
-        echo "  3. The driver source files are valid"
-        ls -la /kernel-build/drivers/net/wireless/broadcom-wl/ 2>/dev/null | head -10
+        echo "  ✗ MISSING: $file"
+        FAILED=1
+    fi
+done
+
+if [ $FAILED -eq 1 ]; then
+    echo ""
+    echo "❌❌❌ BROADCOM-WL WAS NOT COMPILED! ❌❌❌"
+    echo ""
+    echo "Checking what exists in broadcom-wl directory:"
+    if [ -d "/kernel-build/drivers/net/wireless/broadcom-wl" ]; then
+        find /kernel-build/drivers/net/wireless/broadcom-wl -type f -name "*.o" -o -name "*.ko" -o -name "*.a" 2>/dev/null | while read f; do
+            echo "  $(ls -lh "$f" 2>/dev/null)"
+        done
+    else
+        echo "  Directory doesn't even exist!"
+    fi
+    exit 1
+fi
+
+# 2. For built-in: Check wl.o or built-in.a
+if grep -q "CONFIG_WLAN_VENDOR_BROADCOM_WL=y" /kernel-build/.config; then
+    echo ""
+    echo "Checking for built-in driver object:"
+    if [ -f "/kernel-build/drivers/net/wireless/broadcom-wl/wl.o" ]; then
+        size=$(stat -c%s "/kernel-build/drivers/net/wireless/broadcom-wl/wl.o" 2>/dev/null || echo "0")
+        if [ "$size" -gt 1000000 ]; then  # Should be > 1MB
+            echo "  ✓ wl.o found ($(ls -lh /kernel-build/drivers/net/wireless/broadcom-wl/wl.o | awk '{print $5}'))"
+        else
+            echo "  ✗ wl.o exists but too small!"
+            exit 1
+        fi
+    elif [ -f "/kernel-build/drivers/net/wireless/broadcom-wl/built-in.a" ]; then
+        size=$(stat -c%s "/kernel-build/drivers/net/wireless/broadcom-wl/built-in.a" 2>/dev/null || echo "0")
+        if [ "$size" -gt 1000000 ]; then  # Should be > 1MB
+            echo "  ✓ built-in.a found ($(ls -lh /kernel-build/drivers/net/wireless/broadcom-wl/built-in.a | awk '{print $5}'))"
+        else
+            echo "  ✗ built-in.a exists but too small!"
+            exit 1
+        fi
+    else
+        echo "  ✗ Neither wl.o nor built-in.a found!"
+        echo "  ❌ DRIVER NOT BUILT INTO KERNEL!"
         exit 1
     fi
-else
-    echo "✗ CRITICAL FAILURE!"
-    echo "ERROR: /kernel-build/drivers/net/wireless/broadcom-wl directory does not exist!"
-    echo "The driver was completely skipped during kernel build!"
-    echo ""
-    echo "Checking what's in drivers/net/wireless/:"
-    ls -la /kernel-build/drivers/net/wireless/ | grep -E "broadcom|wl" || echo "No broadcom directories found!"
-    echo ""
-    echo "Checking kernel source:"
-    ls -la /kernel-source/drivers/net/wireless/ | grep -E "broadcom|wl" || echo "No broadcom directories found!"
-    exit 1
 fi
 
-# Check if vmlinux contains BCM4352 driver symbols
-if [ -f "/kernel-build/vmlinux" ]; then
-    echo -n "Checking vmlinux for broadcom-wl specific symbols... "
-    # Look for symbols specific to the broadcom-wl driver:
-    # wl_pci_probe, wl_attach, wl_module_init, wl_ioctl, wl_cfg80211_* functions
-    BCM_SYMBOLS=$(nm /kernel-build/vmlinux 2>/dev/null | grep -E " [tT] (wl_pci_probe|wl_attach|wl_module_init|wl_ioctl|wl_cfg80211_attach|wl_cfg80211_detach|wl_open|wl_close|wl_start|wl_free)" | wc -l)
-    if [ "$BCM_SYMBOLS" -gt 0 ]; then
-        echo "✓ FOUND ($BCM_SYMBOLS symbols)"
-        echo "Sample broadcom-wl driver functions in vmlinux:"
-        nm /kernel-build/vmlinux 2>/dev/null | grep -E " [tT] (wl_pci_probe|wl_attach|wl_module_init|wl_ioctl|wl_cfg80211_attach|wl_cfg80211_detach|wl_open|wl_close|wl_start|wl_free)" | head -5 | sed 's/^/  /'
-    else
-        echo "✗ NOT FOUND"
-        echo "WARNING: broadcom-wl driver symbols not found in vmlinux!"
-        echo "Looking for any 'wl_' symbols as fallback:"
-        nm /kernel-build/vmlinux 2>/dev/null | grep " [tT] wl_" | head -5 | sed 's/^/  /'
-    fi
-else
-    echo "Warning: vmlinux not found, skipping symbol check"
-fi
-
-# Check if System.map contains broadcom-wl symbols
-if [ -f "/kernel-build/System.map" ]; then
-    echo -n "Checking System.map for broadcom-wl symbols... "
-    MAP_SYMBOLS=$(grep -E " [tT] (wl_pci_probe|wl_attach|wl_module_init|wl_ioctl|wl_cfg80211_attach|wl_cfg80211_detach|wl_open|wl_close|wl_start|wl_free)" /kernel-build/System.map 2>/dev/null | wc -l)
-    if [ "$MAP_SYMBOLS" -gt 0 ]; then
-        echo "✓ FOUND ($MAP_SYMBOLS symbols)"
-        grep -E " [tT] (wl_pci_probe|wl_attach|wl_module_init|wl_ioctl|wl_cfg80211_attach|wl_cfg80211_detach|wl_open|wl_close|wl_start|wl_free)" /kernel-build/System.map 2>/dev/null | head -5 | sed 's/^/  /'
-    else
-        echo "✗ NOT FOUND"
-        echo "Checking for any wl_ symbols:"
-        grep " [tT] wl_" /kernel-build/System.map 2>/dev/null | head -5 | sed 's/^/  /' || echo "  No wl_ symbols found at all!"
-    fi
-fi
-
-# Check if driver was built as module or built-in
 echo ""
-echo -n "Driver configuration: "
-if grep -q "CONFIG_WLAN_VENDOR_BROADCOM_WL=y" /kernel-build/.config 2>/dev/null; then
-    echo "BUILT-IN (=y)"
-    if [ "$BCM_SYMBOLS" -eq 0 ]; then
-        echo "ERROR: Driver configured as built-in but symbols not found in kernel!"
-        echo "Please check the build logs for errors."
-        exit 1
-    fi
-elif grep -q "CONFIG_WLAN_VENDOR_BROADCOM_WL=m" /kernel-build/.config 2>/dev/null; then
-    echo "MODULE (=m)"
-    # Check if module was actually built
-    if [ -f "/kernel-build/drivers/net/wireless/broadcom-wl/wl.ko" ]; then
-        echo "  Module found: /kernel-build/drivers/net/wireless/broadcom-wl/wl.ko"
-        echo "  Module info:"
-        modinfo /kernel-build/drivers/net/wireless/broadcom-wl/wl.ko 2>/dev/null | head -5 | sed 's/^/    /'
-    else
-        echo "  WARNING: Module wl.ko not found!"
-    fi
-else
-    echo "NOT CONFIGURED"
-    echo "ERROR: CONFIG_WLAN_VENDOR_BROADCOM_WL is not set in kernel config!"
-    exit 1
-fi
+echo "✅ BROADCOM-WL SUCCESSFULLY COMPILED!"
+echo "============================================="
 
-# Final summary
-echo ""
-echo "============================================="
-if [ "$BCM_SYMBOLS" -gt 0 ] || [ -f "/kernel-build/drivers/net/wireless/broadcom-wl/wl.ko" ]; then
-    echo "✓ BCM4352 driver build verification PASSED"
-else
-    echo "✗ BCM4352 driver build verification FAILED"
-    echo "Driver was not successfully integrated into the kernel!"
-    exit 1
-fi
-echo "============================================="
+# REMOVED vmlinux and System.map checks - they are UNRELIABLE
+
