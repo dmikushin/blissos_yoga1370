@@ -109,11 +109,54 @@ export KCFLAGS="-O3 -march=native -pipe"
 export KCPPFLAGS="-O3 -march=native -pipe"
 
 # DEBUG: Check broadcom-wl in source before build
-echo "DEBUG: Checking broadcom-wl in kernel source before build:"
-ls -la /kernel-source/drivers/net/wireless/broadcom-wl 2>/dev/null | head -5 || echo "  broadcom-wl NOT in source!"
+echo ""
+echo "============================================="
+echo "PRE-BUILD DIAGNOSTICS"
+echo "============================================="
+echo "1. Checking broadcom-wl in kernel source:"
+if [ -d /kernel-source/drivers/net/wireless/broadcom-wl ]; then
+    echo "  ✓ Directory exists"
+    ls -la /kernel-source/drivers/net/wireless/broadcom-wl/ | head -5
+else
+    echo "  ✗ Directory NOT found!"
+fi
+
+echo ""
+echo "2. Checking Kconfig integration:"
+if grep -q "broadcom-wl/Kconfig" /kernel-source/drivers/net/wireless/Kconfig; then
+    echo "  ✓ Found in Kconfig:"
+    grep "broadcom-wl" /kernel-source/drivers/net/wireless/Kconfig
+else
+    echo "  ✗ NOT in Kconfig!"
+fi
+
+echo ""
+echo "3. Checking Makefile integration:"
+if grep -q "broadcom-wl" /kernel-source/drivers/net/wireless/Makefile; then
+    echo "  ✓ Found in Makefile:"
+    grep "broadcom-wl" /kernel-source/drivers/net/wireless/Makefile
+else
+    echo "  ✗ NOT in Makefile!"
+fi
+
+echo ""
+echo "4. Checking CONFIG_WLAN_VENDOR_BROADCOM_WL in .config:"
+grep "CONFIG_WLAN_VENDOR_BROADCOM_WL" /kernel-build/.config || echo "  ✗ NOT found in .config!"
+
+echo ""
+echo "5. Checking if Kconfig option is visible:"
+grep -A5 "config WLAN_VENDOR_BROADCOM_WL" /kernel-source/drivers/net/wireless/broadcom-wl/Kconfig || echo "  ✗ Kconfig not readable!"
+
+echo ""
+echo "6. Testing if kernel will process broadcom-wl:"
+echo "  Running: make -C /kernel-source O=/kernel-build M=drivers/net/wireless/broadcom-wl"
+make -C /kernel-source O=/kernel-build M=drivers/net/wireless/broadcom-wl HOSTCC=clang CC=clang LLVM=1 2>&1 | head -20
+
+echo "============================================="
+echo ""
 
 # Build with clang and LTO
-echo "Starting kernel build..."
+echo "Starting full kernel build..."
 make -C /kernel-source \
     O=/kernel-build \
     CC=clang \
@@ -131,13 +174,44 @@ make -C /kernel-source \
     -j$(nproc) \
     bzImage modules
 
-echo "Build completed successfully!"
-echo "Kernel image: /kernel-build/arch/x86/boot/bzImage"
-echo "Modules in: /kernel-build/"
+echo "Build completed (but checking broadcom-wl...)"
 
 # DEBUG: Check if broadcom-wl was processed during build
-echo "DEBUG: Checking if broadcom-wl directory was created in build:"
-ls -la /kernel-build/drivers/net/wireless/ | grep broadcom || echo "  No broadcom directories in build output!"
+echo ""
+echo "============================================="
+echo "POST-BUILD: Checking if broadcom-wl was built"
+echo "============================================="
+echo "Checking /kernel-build/drivers/net/wireless/:"
+ls -la /kernel-build/drivers/net/wireless/ | grep broadcom || echo "  ✗ No broadcom directories!"
+
+# Try to force-build the module explicitly
+echo ""
+echo "Attempting to force-build broadcom-wl module explicitly..."
+if [ -d /kernel-source/drivers/net/wireless/broadcom-wl ]; then
+    echo "Building module with: make M=drivers/net/wireless/broadcom-wl"
+    make -C /kernel-source \
+        O=/kernel-build \
+        M=drivers/net/wireless/broadcom-wl \
+        CC=clang \
+        HOSTCC=clang \
+        LLVM=1 \
+        modules 2>&1 | tail -30
+    
+    echo ""
+    echo "After explicit module build:"
+    if [ -d /kernel-build/drivers/net/wireless/broadcom-wl ]; then
+        echo "  ✓ Directory created!"
+        find /kernel-build/drivers/net/wireless/broadcom-wl -name "*.o" -o -name "*.ko" | head -10
+    else
+        echo "  ✗ Still no directory! Module build failed!"
+    fi
+fi
+
+echo "============================================="
+echo ""
+
+echo "Kernel image: /kernel-build/arch/x86/boot/bzImage"
+echo "Modules in: /kernel-build/"
 
 echo ""
 echo "============================================="
