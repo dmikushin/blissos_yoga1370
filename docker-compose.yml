@@ -87,20 +87,32 @@ services:
           echo 'broadcom-wl already in Kconfig'
         fi
         
-        # Add to Makefile
-        if ! grep -q 'obj-\$$(CONFIG_WLAN_VENDOR_BROADCOM_WL)' /kernel-source/drivers/net/wireless/Makefile 2>/dev/null; then
-          echo 'Adding broadcom-wl to Makefile...'
+        # Add to Makefile (and remove old wrong entries)
+        echo 'Cleaning up old wrong CONFIG_WL entries...'
+        sed -i '/obj-\$$(CONFIG_WL).*broadcom-wl/d' /kernel-source/drivers/net/wireless/Makefile
+        
+        if ! grep -q 'obj-\$$(CONFIG_WLAN_VENDOR_BROADCOM_WL).*broadcom-wl' /kernel-source/drivers/net/wireless/Makefile 2>/dev/null; then
+          echo 'Adding broadcom-wl to Makefile with correct CONFIG...'
           echo 'obj-\$$(CONFIG_WLAN_VENDOR_BROADCOM_WL) += broadcom-wl/' >> /kernel-source/drivers/net/wireless/Makefile
         else
-          echo 'broadcom-wl already in Makefile'
+          echo 'broadcom-wl already in Makefile with correct CONFIG'
         fi
         
         # Verify integration
         echo '=== Verifying integration ==='
         echo 'Checking Kconfig:'
         grep 'broadcom-wl' /kernel-source/drivers/net/wireless/Kconfig || echo 'ERROR: Not found in Kconfig!'
-        echo 'Checking Makefile:'
-        grep 'broadcom-wl' /kernel-source/drivers/net/wireless/Makefile || echo 'ERROR: Not found in Makefile!'
+        echo 'Checking Makefile for CORRECT config:'
+        if grep -q 'CONFIG_WLAN_VENDOR_BROADCOM_WL.*broadcom-wl' /kernel-source/drivers/net/wireless/Makefile; then
+          echo '  ✓ CORRECT: CONFIG_WLAN_VENDOR_BROADCOM_WL'
+          grep 'CONFIG_WLAN_VENDOR_BROADCOM_WL.*broadcom-wl' /kernel-source/drivers/net/wireless/Makefile
+        else
+          echo '  ✗ ERROR: CONFIG_WLAN_VENDOR_BROADCOM_WL not found!'
+        fi
+        if grep -q 'CONFIG_WL.*broadcom-wl' /kernel-source/drivers/net/wireless/Makefile; then
+          echo '  ✗ ERROR: Found WRONG CONFIG_WL! This will NOT work!'
+          grep 'CONFIG_WL.*broadcom-wl' /kernel-source/drivers/net/wireless/Makefile
+        fi
         
         # Run build script
         /usr/local/bin/build-kernel.sh
