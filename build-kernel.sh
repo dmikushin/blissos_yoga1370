@@ -24,8 +24,29 @@ else
     exit 1
 fi
 
+# Verify driver is properly integrated in kernel source
+echo "Verifying broadcom-wl driver integration..."
+if [ ! -d "/kernel-source/drivers/net/wireless/broadcom-wl" ]; then
+    echo "ERROR: broadcom-wl driver not found in kernel source!"
+    echo "Expected at: /kernel-source/drivers/net/wireless/broadcom-wl"
+    exit 1
+fi
+
+if ! grep -q "broadcom-wl/Kconfig" /kernel-source/drivers/net/wireless/Kconfig; then
+    echo "ERROR: broadcom-wl not integrated in Kconfig!"
+    echo "Missing: source \"drivers/net/wireless/broadcom-wl/Kconfig\""
+    exit 1
+fi
+
+if ! grep -q "CONFIG_WLAN_VENDOR_BROADCOM_WL.*broadcom-wl" /kernel-source/drivers/net/wireless/Makefile; then
+    echo "ERROR: broadcom-wl not integrated in Makefile!"
+    echo "Missing: obj-\$(CONFIG_WLAN_VENDOR_BROADCOM_WL) += broadcom-wl/"
+    exit 1
+fi
+echo "✓ Driver properly integrated in kernel source"
+
 # Enable Broadcom WL driver for BCM4352
-echo "Adding Broadcom BCM4352 wireless support..."
+echo "Adding Broadcom BCM4352 wireless support to config..."
 cat >> /kernel-build/.config << EOF
 
 # Broadcom BCM4352 wireless configuration

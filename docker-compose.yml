@@ -57,12 +57,30 @@ services:
         fi
         
         # Add driver to Kconfig and Makefile if not already added
+        echo '=== Integrating driver into kernel build system ==='
+        
+        # Add to Kconfig
         if ! grep -q 'source \"drivers/net/wireless/broadcom-wl/Kconfig\"' /kernel-source/drivers/net/wireless/Kconfig 2>/dev/null; then
+          echo 'Adding broadcom-wl to Kconfig...'
           echo 'source \"drivers/net/wireless/broadcom-wl/Kconfig\"' >> /kernel-source/drivers/net/wireless/Kconfig
+        else
+          echo 'broadcom-wl already in Kconfig'
         fi
+        
+        # Add to Makefile
         if ! grep -q 'obj-\$$(CONFIG_WLAN_VENDOR_BROADCOM_WL)' /kernel-source/drivers/net/wireless/Makefile 2>/dev/null; then
+          echo 'Adding broadcom-wl to Makefile...'
           echo 'obj-\$$(CONFIG_WLAN_VENDOR_BROADCOM_WL) += broadcom-wl/' >> /kernel-source/drivers/net/wireless/Makefile
+        else
+          echo 'broadcom-wl already in Makefile'
         fi
+        
+        # Verify integration
+        echo '=== Verifying integration ==='
+        echo 'Checking Kconfig:'
+        grep 'broadcom-wl' /kernel-source/drivers/net/wireless/Kconfig || echo 'ERROR: Not found in Kconfig!'
+        echo 'Checking Makefile:'
+        grep 'broadcom-wl' /kernel-source/drivers/net/wireless/Makefile || echo 'ERROR: Not found in Makefile!'
         
         # Run build script
         /usr/local/bin/build-kernel.sh
