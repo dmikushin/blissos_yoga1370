@@ -87,32 +87,24 @@ services:
           echo 'broadcom-wl already in Kconfig'
         fi
         
-        # Add to Makefile (and remove old wrong entries)
-        echo 'Cleaning up old wrong CONFIG_WL entries...'
-        sed -i '/obj-\$$(CONFIG_WL).*broadcom-wl/d' /kernel-source/drivers/net/wireless/Makefile
+        # Clean ALL broadcom-wl entries from Makefile (both wrong and duplicates)
+        echo 'Cleaning ALL broadcom-wl entries from Makefile...'
+        sed -i '/broadcom-wl/d' /kernel-source/drivers/net/wireless/Makefile
         
-        if ! grep -q 'obj-\$$(CONFIG_WLAN_VENDOR_BROADCOM_WL).*broadcom-wl' /kernel-source/drivers/net/wireless/Makefile 2>/dev/null; then
-          echo 'Adding broadcom-wl to Makefile with correct CONFIG...'
-          echo 'obj-\$$(CONFIG_WLAN_VENDOR_BROADCOM_WL) += broadcom-wl/' >> /kernel-source/drivers/net/wireless/Makefile
-        else
-          echo 'broadcom-wl already in Makefile with correct CONFIG'
-        fi
+        # Add ONE correct entry
+        echo 'Adding ONE correct broadcom-wl entry to Makefile...'
+        echo 'obj-$$(CONFIG_WLAN_VENDOR_BROADCOM_WL) += broadcom-wl/' >> /kernel-source/drivers/net/wireless/Makefile
         
-        # Verify integration
-        echo '=== Verifying integration ==='
-        echo 'Checking Kconfig:'
-        grep 'broadcom-wl' /kernel-source/drivers/net/wireless/Kconfig || echo 'ERROR: Not found in Kconfig!'
-        echo 'Checking Makefile for CORRECT config:'
-        if grep -q 'CONFIG_WLAN_VENDOR_BROADCOM_WL.*broadcom-wl' /kernel-source/drivers/net/wireless/Makefile; then
-          echo '  ✓ CORRECT: CONFIG_WLAN_VENDOR_BROADCOM_WL'
-          grep 'CONFIG_WLAN_VENDOR_BROADCOM_WL.*broadcom-wl' /kernel-source/drivers/net/wireless/Makefile
-        else
-          echo '  ✗ ERROR: CONFIG_WLAN_VENDOR_BROADCOM_WL not found!'
-        fi
-        if grep -q 'CONFIG_WL.*broadcom-wl' /kernel-source/drivers/net/wireless/Makefile; then
-          echo '  ✗ ERROR: Found WRONG CONFIG_WL! This will NOT work!'
-          grep 'CONFIG_WL.*broadcom-wl' /kernel-source/drivers/net/wireless/Makefile
-        fi
+        # Show what we added
+        echo 'Makefile now contains:'
+        grep 'broadcom-wl' /kernel-source/drivers/net/wireless/Makefile
+        
+        # Final verification
+        echo '=== Final verification ==='
+        echo 'Makefile (should have exactly ONE line):'
+        grep -c 'broadcom-wl' /kernel-source/drivers/net/wireless/Makefile || true
+        echo 'Kconfig (should have exactly ONE line):'
+        grep -c 'broadcom-wl' /kernel-source/drivers/net/wireless/Kconfig || true
         
         # Run build script
         /usr/local/bin/build-kernel.sh
