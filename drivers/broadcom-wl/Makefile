@@ -117,35 +117,32 @@ GCCVERSION := $(subst $(space),$(empty),$(GCCVERSION))
 GCCVERSION := $(shell expr `echo $(GCCVERSION)` | cut -b1-3)
 GE_49 := $(shell expr `echo $(GCCVERSION)` \>= 490)
 
-EXTRA_CFLAGS :=
+ccflags-y :=
 
 ifeq ($(APIFINAL),CFG80211)
-  EXTRA_CFLAGS += -DUSE_CFG80211
+  ccflags-y += -DUSE_CFG80211
   $(info Using CFG80211 API)
 endif
 
 ifeq ($(APIFINAL),WEXT)
-  EXTRA_CFLAGS += -DUSE_IW
+  ccflags-y += -DUSE_IW
   $(info Using Wireless Extension API)
 endif
 
-obj-m              += wl.o
+obj-$(CONFIG_WLAN_VENDOR_BROADCOM_WL) += wl.o
 
 wl-objs            :=
 wl-objs            += src/shared/linux_osl.o
 wl-objs            += src/wl/sys/wl_linux.o
 wl-objs            += src/wl/sys/wl_iw.o
 wl-objs            += src/wl/sys/wl_cfg80211_hybrid.o
+wl-objs            += lib/wlc_hybrid.o_shipped
 
-EXTRA_CFLAGS       += -I$(src)/src/include -I$(src)/src/common/include
-EXTRA_CFLAGS       += -I$(src)/src/wl/sys -I$(src)/src/wl/phy -I$(src)/src/wl/ppr/include
-EXTRA_CFLAGS       += -I$(src)/src/shared/bcmwifi/include
-#EXTRA_CFLAGS       += -DBCMDBG_ASSERT -DBCMDBG_ERR
-ifeq "$(GE_49)" "1"
-EXTRA_CFLAGS       += -Wno-date-time
-endif
-
-EXTRA_LDFLAGS      := $(src)/lib/wlc_hybrid.o_shipped
+ccflags-y          += -I$(src)/src/include -I$(src)/src/common/include
+ccflags-y          += -I$(src)/src/wl/sys -I$(src)/src/wl/phy -I$(src)/src/wl/ppr/include
+ccflags-y          += -I$(src)/src/shared/bcmwifi/include
+ccflags-y          += -Wno-date-time
+#ccflags-y          += -DBCMDBG_ASSERT -DBCMDBG_ERR
 
 KBASE              ?= /lib/modules/`uname -r`
 KBUILD_DIR         ?= $(KBASE)/build
