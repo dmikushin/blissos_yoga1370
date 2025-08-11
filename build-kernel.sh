@@ -64,6 +64,41 @@ EOF
 echo "Updating config for current build environment..."
 make -C /kernel-source O=/kernel-build HOSTCC=clang CC=clang LLVM=1 olddefconfig
 
+# Verify that CONFIG_WLAN_VENDOR_BROADCOM_WL is set correctly after olddefconfig
+echo "Verifying BCM4352 driver configuration..."
+if grep -q "CONFIG_WLAN_VENDOR_BROADCOM_WL=y" /kernel-build/.config; then
+    echo "✓ Driver configured as built-in (=y)"
+elif grep -q "CONFIG_WLAN_VENDOR_BROADCOM_WL=m" /kernel-build/.config; then
+    echo "⚠ Driver configured as module (=m)"
+    echo "Forcing built-in configuration..."
+    sed -i 's/CONFIG_WLAN_VENDOR_BROADCOM_WL=m/CONFIG_WLAN_VENDOR_BROADCOM_WL=y/' /kernel-build/.config
+    echo "✓ Changed to built-in (=y)"
+elif grep -q "# CONFIG_WLAN_VENDOR_BROADCOM_WL is not set" /kernel-build/.config; then
+    echo "✗ ERROR: Driver was disabled by olddefconfig!"
+    echo "Forcing configuration..."
+    sed -i 's/# CONFIG_WLAN_VENDOR_BROADCOM_WL is not set/CONFIG_WLAN_VENDOR_BROADCOM_WL=y/' /kernel-build/.config
+    # Also ensure dependencies are met
+    grep -q "CONFIG_PCI=y" /kernel-build/.config || echo "CONFIG_PCI=y" >> /kernel-build/.config
+    grep -q "CONFIG_CFG80211" /kernel-build/.config || echo "CONFIG_CFG80211=y" >> /kernel-build/.config
+    echo "✓ Forced to built-in (=y)"
+else
+    echo "✗ ERROR: CONFIG_WLAN_VENDOR_BROADCOM_WL not found in .config!"
+    echo "Adding it manually..."
+    echo "CONFIG_WLAN_VENDOR_BROADCOM_WL=y" >> /kernel-build/.config
+fi
+
+# Run olddefconfig again to validate our changes
+echo "Validating configuration..."
+make -C /kernel-source O=/kernel-build HOSTCC=clang CC=clang LLVM=1 olddefconfig
+
+# Final check
+if ! grep -q "CONFIG_WLAN_VENDOR_BROADCOM_WL=y\|CONFIG_WLAN_VENDOR_BROADCOM_WL=m" /kernel-build/.config; then
+    echo "CRITICAL ERROR: Unable to enable CONFIG_WLAN_VENDOR_BROADCOM_WL!"
+    echo "Check that dependencies (PCI, CFG80211) are met."
+    grep "CONFIG_PCI\|CONFIG_CFG80211" /kernel-build/.config | head -5
+    exit 1
+fi
+
 # Set build flags matching original build
 export KBUILD_BUILD_USER="jack"
 export KBUILD_BUILD_HOST="orion"
