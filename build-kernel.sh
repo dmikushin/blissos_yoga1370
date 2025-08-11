@@ -108,7 +108,12 @@ export KBUILD_BUILD_TIMESTAMP="Mon Jul 15 08:34:16 EDT 2024"
 export KCFLAGS="-O3 -march=native -pipe"
 export KCPPFLAGS="-O3 -march=native -pipe"
 
+# DEBUG: Check broadcom-wl in source before build
+echo "DEBUG: Checking broadcom-wl in kernel source before build:"
+ls -la /kernel-source/drivers/net/wireless/broadcom-wl 2>/dev/null | head -5 || echo "  broadcom-wl NOT in source!"
+
 # Build with clang and LTO
+echo "Starting kernel build..."
 make -C /kernel-source \
     O=/kernel-build \
     CC=clang \
@@ -129,6 +134,10 @@ make -C /kernel-source \
 echo "Build completed successfully!"
 echo "Kernel image: /kernel-build/arch/x86/boot/bzImage"
 echo "Modules in: /kernel-build/"
+
+# DEBUG: Check if broadcom-wl was processed during build
+echo "DEBUG: Checking if broadcom-wl directory was created in build:"
+ls -la /kernel-build/drivers/net/wireless/ | grep broadcom || echo "  No broadcom directories in build output!"
 
 echo ""
 echo "============================================="

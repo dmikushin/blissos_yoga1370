@@ -48,8 +48,28 @@ services:
         echo '=== Installing Broadcom BCM4352 driver ==='
         mkdir -p /kernel-source/drivers/net/wireless/
         if [ -d /drivers/broadcom-wl ]; then
-          cp -r /drivers/broadcom-wl /kernel-source/drivers/net/wireless/
-          echo 'Driver copied successfully'
+          echo 'Copying driver from /drivers/broadcom-wl to kernel source...'
+          cp -rv /drivers/broadcom-wl /kernel-source/drivers/net/wireless/ 2>&1 | head -20
+          
+          # CRITICAL: Verify the copy actually worked
+          if [ ! -d /kernel-source/drivers/net/wireless/broadcom-wl ]; then
+            echo 'ERROR: Failed to copy driver to kernel source!'
+            exit 1
+          fi
+          
+          # Check that essential files exist
+          if [ ! -f /kernel-source/drivers/net/wireless/broadcom-wl/Makefile ]; then
+            echo 'ERROR: Makefile not found after copy!'
+            exit 1
+          fi
+          
+          if [ ! -f /kernel-source/drivers/net/wireless/broadcom-wl/Kconfig ]; then
+            echo 'ERROR: Kconfig not found after copy!'
+            exit 1
+          fi
+          
+          echo 'Driver copied successfully. Contents:'
+          ls -la /kernel-source/drivers/net/wireless/broadcom-wl/ | head -10
         else
           echo 'ERROR: /drivers/broadcom-wl not found!'
           ls -la /drivers/
