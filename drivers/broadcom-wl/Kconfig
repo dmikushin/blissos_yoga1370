@@ -1,4 +1,4 @@
-config WL
+config WLAN_VENDOR_BROADCOM_WL
 	tristate "Broadcom IEEE802.11 (wl) driver"
 	depends on PCI && CFG80211
 	select WEXT_PRIV

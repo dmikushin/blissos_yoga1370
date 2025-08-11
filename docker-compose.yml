@@ -47,14 +47,21 @@ services:
         # Copy our broadcom-wl driver to kernel source
         echo '=== Installing Broadcom BCM4352 driver ==='
         mkdir -p /kernel-source/drivers/net/wireless/
-        cp -r /drivers/broadcom-wl /kernel-source/drivers/net/wireless/
+        if [ -d /drivers/broadcom-wl ]; then
+          cp -r /drivers/broadcom-wl /kernel-source/drivers/net/wireless/
+          echo 'Driver copied successfully'
+        else
+          echo 'ERROR: /drivers/broadcom-wl not found!'
+          ls -la /drivers/
+          exit 1
+        fi
         
         # Add driver to Kconfig and Makefile if not already added
         if ! grep -q 'source \"drivers/net/wireless/broadcom-wl/Kconfig\"' /kernel-source/drivers/net/wireless/Kconfig 2>/dev/null; then
           echo 'source \"drivers/net/wireless/broadcom-wl/Kconfig\"' >> /kernel-source/drivers/net/wireless/Kconfig
         fi
-        if ! grep -q 'obj-\$$(CONFIG_WL)' /kernel-source/drivers/net/wireless/Makefile 2>/dev/null; then
-          echo 'obj-\$$(CONFIG_WL) += broadcom-wl/' >> /kernel-source/drivers/net/wireless/Makefile
+        if ! grep -q 'obj-\$$(CONFIG_WLAN_VENDOR_BROADCOM_WL)' /kernel-source/drivers/net/wireless/Makefile 2>/dev/null; then
+          echo 'obj-\$$(CONFIG_WLAN_VENDOR_BROADCOM_WL) += broadcom-wl/' >> /kernel-source/drivers/net/wireless/Makefile
         fi
         
         # Run build script
