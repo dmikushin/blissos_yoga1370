@@ -73,3 +73,74 @@ make -C /kernel-source \
 echo "Build completed successfully!"
 echo "Kernel image: /kernel-build/arch/x86/boot/bzImage"
 echo "Modules in: /kernel-build/"
+
+echo ""
+echo "============================================="
+echo "Checking BCM4352 driver integration..."
+echo "============================================="
+
+# Check if vmlinux contains BCM4352 driver symbols
+if [ -f "/kernel-build/vmlinux" ]; then
+    echo -n "Checking vmlinux for BCM4352 symbols... "
+    BCM_SYMBOLS=$(nm /kernel-build/vmlinux 2>/dev/null | grep -E "wl_linux_|wl_cfg80211_|bcm_" | wc -l)
+    if [ "$BCM_SYMBOLS" -gt 0 ]; then
+        echo "✓ FOUND ($BCM_SYMBOLS symbols)"
+        echo "Sample BCM4352 functions in vmlinux:"
+        nm /kernel-build/vmlinux 2>/dev/null | grep -E "wl_linux_|wl_cfg80211_|bcm_" | head -5 | sed 's/^/  /'
+    else
+        echo "✗ NOT FOUND"
+        echo "WARNING: BCM4352 driver symbols not found in vmlinux!"
+    fi
+else
+    echo "Warning: vmlinux not found, skipping symbol check"
+fi
+
+# Check if System.map contains BCM4352 symbols
+if [ -f "/kernel-build/System.map" ]; then
+    echo -n "Checking System.map for BCM4352 symbols... "
+    MAP_SYMBOLS=$(grep -E "wl_linux_|wl_cfg80211_|bcm_" /kernel-build/System.map 2>/dev/null | wc -l)
+    if [ "$MAP_SYMBOLS" -gt 0 ]; then
+        echo "✓ FOUND ($MAP_SYMBOLS symbols)"
+        grep -E "wl_linux_|wl_cfg80211_|bcm_" /kernel-build/System.map 2>/dev/null | head -5 | sed 's/^/  /'
+    else
+        echo "✗ NOT FOUND"
+    fi
+fi
+
+# Check if driver was built as module or built-in
+echo ""
+echo -n "Driver configuration: "
+if grep -q "CONFIG_WLAN_VENDOR_BROADCOM_WL=y" /kernel-build/.config 2>/dev/null; then
+    echo "BUILT-IN (=y)"
+    if [ "$BCM_SYMBOLS" -eq 0 ]; then
+        echo "ERROR: Driver configured as built-in but symbols not found in kernel!"
+        echo "Please check the build logs for errors."
+        exit 1
+    fi
+elif grep -q "CONFIG_WLAN_VENDOR_BROADCOM_WL=m" /kernel-build/.config 2>/dev/null; then
+    echo "MODULE (=m)"
+    # Check if module was actually built
+    if [ -f "/kernel-build/drivers/net/wireless/broadcom-wl/wl.ko" ]; then
+        echo "  Module found: /kernel-build/drivers/net/wireless/broadcom-wl/wl.ko"
+        echo "  Module info:"
+        modinfo /kernel-build/drivers/net/wireless/broadcom-wl/wl.ko 2>/dev/null | head -5 | sed 's/^/    /'
+    else
+        echo "  WARNING: Module wl.ko not found!"
+    fi
+else
+    echo "NOT CONFIGURED"
+    echo "ERROR: CONFIG_WLAN_VENDOR_BROADCOM_WL is not set in kernel config!"
+    exit 1
+fi
+
+# Final summary
+echo ""
+echo "============================================="
+if [ "$BCM_SYMBOLS" -gt 0 ] || [ -f "/kernel-build/drivers/net/wireless/broadcom-wl/wl.ko" ]; then
+    echo "✓ BCM4352 driver build verification PASSED"
+else
+    echo "✗ BCM4352 driver build verification FAILED"
+    echo "Driver was not successfully integrated into the kernel!"
+    exit 1
+fi
+echo "============================================="
