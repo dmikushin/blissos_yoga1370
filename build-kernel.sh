@@ -79,6 +79,36 @@ echo "============================================="
 echo "Checking BCM4352 driver integration..."
 echo "============================================="
 
+# CRITICAL: Check if broadcom-wl was actually compiled
+echo -n "Checking if broadcom-wl was compiled... "
+if [ -d "/kernel-build/drivers/net/wireless/broadcom-wl" ]; then
+    WL_OBJECTS=$(find /kernel-build/drivers/net/wireless/broadcom-wl -name "*.o" 2>/dev/null | wc -l)
+    if [ "$WL_OBJECTS" -gt 0 ]; then
+        echo "✓ FOUND ($WL_OBJECTS object files)"
+        find /kernel-build/drivers/net/wireless/broadcom-wl -name "*.o" -exec ls -lh {} \; | head -5 | sed 's/^/  /'
+    else
+        echo "✗ FAILED - NO OBJECT FILES!"
+        echo "ERROR: broadcom-wl directory exists but contains no compiled objects!"
+        echo "The driver was NOT compiled. Check that:"
+        echo "  1. CONFIG_WLAN_VENDOR_BROADCOM_WL is set in .config"
+        echo "  2. The Makefile in drivers/net/wireless/ includes broadcom-wl"
+        echo "  3. The driver source files are valid"
+        ls -la /kernel-build/drivers/net/wireless/broadcom-wl/ 2>/dev/null | head -10
+        exit 1
+    fi
+else
+    echo "✗ CRITICAL FAILURE!"
+    echo "ERROR: /kernel-build/drivers/net/wireless/broadcom-wl directory does not exist!"
+    echo "The driver was completely skipped during kernel build!"
+    echo ""
+    echo "Checking what's in drivers/net/wireless/:"
+    ls -la /kernel-build/drivers/net/wireless/ | grep -E "broadcom|wl" || echo "No broadcom directories found!"
+    echo ""
+    echo "Checking kernel source:"
+    ls -la /kernel-source/drivers/net/wireless/ | grep -E "broadcom|wl" || echo "No broadcom directories found!"
+    exit 1
+fi
+
 # Check if vmlinux contains BCM4352 driver symbols
 if [ -f "/kernel-build/vmlinux" ]; then
     echo -n "Checking vmlinux for BCM4352 symbols... "
