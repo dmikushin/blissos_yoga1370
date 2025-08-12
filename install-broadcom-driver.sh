@@ -36,6 +36,11 @@ if [ ! -d /kernel-source/drivers/net/wireless/broadcom-wl ]; then
     exit 1
 fi
 
+# Fix the precompiled object file
+echo "Preparing precompiled object..."
+cp /kernel-source/drivers/net/wireless/broadcom-wl/lib/wlc_hybrid.o_shipped \
+   /kernel-source/drivers/net/wireless/broadcom-wl/lib/wlc_hybrid.o
+
 # Create simplified Makefile with correct include paths
 echo "Creating fixed Makefile..."
 cat > /kernel-source/drivers/net/wireless/broadcom-wl/Makefile << 'EOF'
@@ -56,13 +61,21 @@ else
   ccflags-y += -DUSE_IW
 endif
 
+# Main target
 obj-$(CONFIG_WLAN_VENDOR_BROADCOM_WL) += wl.o
 
-wl-objs := src/shared/linux_osl.o
-wl-objs += src/wl/sys/wl_linux.o
-wl-objs += src/wl/sys/wl_iw.o
-wl-objs += src/wl/sys/wl_cfg80211_hybrid.o
-wl-objs += lib/wlc_hybrid.o_shipped
+# Define object files for both built-in and module
+wl-y := src/shared/linux_osl.o
+wl-y += src/wl/sys/wl_linux.o
+wl-y += src/wl/sys/wl_iw.o
+wl-y += src/wl/sys/wl_cfg80211_hybrid.o
+wl-y += lib/wlc_hybrid.o
+
+# Also define for module build
+wl-objs := $(wl-y)
+
+# Force compilation even if nothing depends on it
+always-y := wl.o
 EOF
 
 echo "=== Integrating driver into kernel build system ==="
