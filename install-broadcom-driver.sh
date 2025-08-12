@@ -75,12 +75,24 @@ echo "Include statements fixed"
 echo "Creating simplified Makefile..."
 cat > /kernel-source/drivers/net/wireless/broadcom-wl/Makefile << 'EOF'
 # Simplified Makefile for in-kernel build
-# Headers are now copied to source directories, so simple paths work
+
+# Debug: Show what $(src) actually is
+$(info Building broadcom-wl driver)
+$(info src = $(src))
+$(info obj = $(obj))
+$(info CURDIR = $(CURDIR))
+
+# Since we copied headers to source dirs, use simple paths
+# But also keep original paths as fallback
 ccflags-y := -I$(src)/src/shared
-ccflags-y += -I$(src)/src/wl/sys
+ccflags-y += -I$(src)/src/wl/sys  
 ccflags-y += -I$(src)/src/include
 ccflags-y += -I$(src)/src/common/include
 ccflags-y += -I$(src)/src/shared/bcmwifi/include
+# Also add absolute paths as fallback (for out-of-tree builds)
+ccflags-y += -I/kernel-source/drivers/net/wireless/broadcom-wl/src/include
+ccflags-y += -I/kernel-source/drivers/net/wireless/broadcom-wl/src/shared
+ccflags-y += -I/kernel-source/drivers/net/wireless/broadcom-wl/src/wl/sys
 ccflags-y += -Wno-date-time
 ccflags-y += -D__KERNEL__
 ccflags-y += -DLINUX
