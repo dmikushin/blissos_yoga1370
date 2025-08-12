@@ -117,7 +117,15 @@ GCCVERSION := $(subst $(space),$(empty),$(GCCVERSION))
 GCCVERSION := $(shell expr `echo $(GCCVERSION)` | cut -b1-3)
 GE_49 := $(shell expr `echo $(GCCVERSION)` \>= 490)
 
-ccflags-y :=
+# Include paths MUST be defined first
+ccflags-y := -I$(src)/src/include
+ccflags-y += -I$(src)/src/common/include
+ccflags-y += -I$(src)/src/wl/sys
+ccflags-y += -I$(src)/src/wl/phy
+ccflags-y += -I$(src)/src/wl/ppr/include
+ccflags-y += -I$(src)/src/shared/bcmwifi/include
+ccflags-y += -Wno-date-time
+#ccflags-y += -DBCMDBG_ASSERT -DBCMDBG_ERR
 
 ifeq ($(APIFINAL),CFG80211)
   ccflags-y += -DUSE_CFG80211
@@ -137,12 +145,6 @@ wl-objs            += src/wl/sys/wl_linux.o
 wl-objs            += src/wl/sys/wl_iw.o
 wl-objs            += src/wl/sys/wl_cfg80211_hybrid.o
 wl-objs            += lib/wlc_hybrid.o_shipped
-
-ccflags-y          += -I$(src)/src/include -I$(src)/src/common/include
-ccflags-y          += -I$(src)/src/wl/sys -I$(src)/src/wl/phy -I$(src)/src/wl/ppr/include
-ccflags-y          += -I$(src)/src/shared/bcmwifi/include
-ccflags-y          += -Wno-date-time
-#ccflags-y          += -DBCMDBG_ASSERT -DBCMDBG_ERR
 
 KBASE              ?= /lib/modules/`uname -r`
 KBUILD_DIR         ?= $(KBASE)/build
