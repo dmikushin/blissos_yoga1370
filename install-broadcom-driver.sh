@@ -76,20 +76,36 @@ echo "Creating simplified Makefile..."
 cat > /kernel-source/drivers/net/wireless/broadcom-wl/Makefile << 'EOF'
 # Simplified Makefile for in-kernel build
 
-# Debug: Show what $(src) actually is
-$(info Building broadcom-wl driver)
+# Debug: Show build variables
+$(info === Building broadcom-wl driver ===)
 $(info src = $(src))
-$(info obj = $(obj))
-$(info CURDIR = $(CURDIR))
+$(info obj = $(obj)) 
+$(info srctree = $(srctree))
+$(info M = $(M))
+$(info KBUILD_SRC = $(KBUILD_SRC))
 
-# Since we copied headers to source dirs, use simple paths
-# But also keep original paths as fallback
-ccflags-y := -I$(src)/src/shared
-ccflags-y += -I$(src)/src/wl/sys  
-ccflags-y += -I$(src)/src/include
-ccflags-y += -I$(src)/src/common/include
-ccflags-y += -I$(src)/src/shared/bcmwifi/include
-# Also add absolute paths as fallback (for out-of-tree builds)
+# Handle both in-tree and out-of-tree builds
+# For in-tree builds, src is relative to kernel root
+# For out-of-tree builds, src might be empty or point to module dir
+ifeq ($(src),)
+  # If src is empty, we're likely in module build mode
+  BCM_SRC := .
+else
+  # Normal kernel build
+  BCM_SRC := $(src)
+endif
+
+# Include paths - use both relative and absolute
+ccflags-y := -I$(BCM_SRC)/src/include
+ccflags-y += -I$(BCM_SRC)/src/shared
+ccflags-y += -I$(BCM_SRC)/src/wl/sys  
+ccflags-y += -I$(BCM_SRC)/src/common/include
+ccflags-y += -I$(BCM_SRC)/src/shared/bcmwifi/include
+# Absolute paths as fallback
+ccflags-y += -I$(srctree)/drivers/net/wireless/broadcom-wl/src/include
+ccflags-y += -I$(srctree)/drivers/net/wireless/broadcom-wl/src/shared
+ccflags-y += -I$(srctree)/drivers/net/wireless/broadcom-wl/src/wl/sys
+# Last resort - hardcoded paths
 ccflags-y += -I/kernel-source/drivers/net/wireless/broadcom-wl/src/include
 ccflags-y += -I/kernel-source/drivers/net/wireless/broadcom-wl/src/shared
 ccflags-y += -I/kernel-source/drivers/net/wireless/broadcom-wl/src/wl/sys
@@ -100,25 +116,30 @@ ccflags-y += -DLINUX
 # API selection
 ifneq ($(CONFIG_CFG80211),)
   ccflags-y += -DUSE_CFG80211
+  $(info Using CFG80211 API)
 else
   ccflags-y += -DUSE_IW
+  $(info Using Wireless Extension API)
 endif
 
-# Main target
+# Main target - use CONFIG_WLAN_VENDOR_BROADCOM_WL
 obj-$(CONFIG_WLAN_VENDOR_BROADCOM_WL) += wl.o
 
-# Define object files for both built-in and module
+# Define object files for built-in compilation
 wl-y := src/shared/linux_osl.o
 wl-y += src/wl/sys/wl_linux.o
 wl-y += src/wl/sys/wl_iw.o
 wl-y += src/wl/sys/wl_cfg80211_hybrid.o
 wl-y += lib/wlc_hybrid.o
 
-# Also define for module build
+# Also define wl-objs for module build compatibility
 wl-objs := $(wl-y)
 
-# Force compilation even if nothing depends on it
-always-y := wl.o
+# Debug: Show what we're building
+$(info CONFIG_WLAN_VENDOR_BROADCOM_WL = $(CONFIG_WLAN_VENDOR_BROADCOM_WL))
+$(info wl-y = $(wl-y))
+$(info obj-y = $(obj-y))
+$(info obj-m = $(obj-m))
 EOF
 
 echo "=== Integrating driver into kernel build system ==="
