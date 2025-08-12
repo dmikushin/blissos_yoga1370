@@ -41,18 +41,36 @@ echo "Preparing precompiled object..."
 cp /kernel-source/drivers/net/wireless/broadcom-wl/lib/wlc_hybrid.o_shipped \
    /kernel-source/drivers/net/wireless/broadcom-wl/lib/wlc_hybrid.o
 
+# DEBUG: Check that headers exist
+echo "Checking header files..."
+ls -la /kernel-source/drivers/net/wireless/broadcom-wl/src/include/typedefs.h || echo "WARNING: typedefs.h not found!"
+
+# FIX: Change angle brackets to quotes in source files
+echo "Fixing include statements in source files..."
+find /kernel-source/drivers/net/wireless/broadcom-wl/src -name "*.c" -exec sed -i 's/#include <typedefs\.h>/#include "typedefs.h"/g' {} \;
+find /kernel-source/drivers/net/wireless/broadcom-wl/src -name "*.c" -exec sed -i 's/#include <bcmutils\.h>/#include "bcmutils.h"/g' {} \;
+find /kernel-source/drivers/net/wireless/broadcom-wl/src -name "*.c" -exec sed -i 's/#include <linux_osl\.h>/#include "linux_osl.h"/g' {} \;
+find /kernel-source/drivers/net/wireless/broadcom-wl/src -name "*.c" -exec sed -i 's/#include <linuxver\.h>/#include "linuxver.h"/g' {} \;
+find /kernel-source/drivers/net/wireless/broadcom-wl/src -name "*.c" -exec sed -i 's/#include <osl\.h>/#include "osl.h"/g' {} \;
+find /kernel-source/drivers/net/wireless/broadcom-wl/src -name "*.c" -exec sed -i 's/#include <bcmdefs\.h>/#include "bcmdefs.h"/g' {} \;
+find /kernel-source/drivers/net/wireless/broadcom-wl/src -name "*.c" -exec sed -i 's/#include <bcmdevs\.h>/#include "bcmdevs.h"/g' {} \;
+find /kernel-source/drivers/net/wireless/broadcom-wl/src -name "*.c" -exec sed -i 's/#include <pcicfg\.h>/#include "pcicfg.h"/g' {} \;
+echo "Include statements fixed"
+
 # Create simplified Makefile with correct include paths
 echo "Creating fixed Makefile..."
 cat > /kernel-source/drivers/net/wireless/broadcom-wl/Makefile << 'EOF'
 # Simplified Makefile for in-kernel build
-# Include paths MUST be first
+# Include paths MUST be first - using both -I and -isystem for compatibility
 ccflags-y := -I$(src)/src/include
+ccflags-y += -isystem $(src)/src/include
 ccflags-y += -I$(src)/src/common/include
 ccflags-y += -I$(src)/src/wl/sys
 ccflags-y += -I$(src)/src/wl/phy
 ccflags-y += -I$(src)/src/wl/ppr/include
 ccflags-y += -I$(src)/src/shared/bcmwifi/include
 ccflags-y += -Wno-date-time
+ccflags-y += -D__KERNEL__
 
 # API selection
 ifneq ($(CONFIG_CFG80211),)
