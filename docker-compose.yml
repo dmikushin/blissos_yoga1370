@@ -70,6 +70,36 @@ services:
           
           echo 'Driver copied successfully. Contents:'
           ls -la /kernel-source/drivers/net/wireless/broadcom-wl/ | head -10
+          
+          # FIX: Create simplified Makefile with correct include paths
+          echo 'Creating fixed Makefile with correct include paths...'
+          cat > /kernel-source/drivers/net/wireless/broadcom-wl/Makefile << 'MAKEFILE_EOF'
+# Simplified Makefile for in-kernel build
+# Include paths FIRST - this is CRITICAL
+ccflags-y := -I$$(src)/src/include
+ccflags-y += -I$$(src)/src/common/include
+ccflags-y += -I$$(src)/src/wl/sys
+ccflags-y += -I$$(src)/src/wl/phy
+ccflags-y += -I$$(src)/src/wl/ppr/include
+ccflags-y += -I$$(src)/src/shared/bcmwifi/include
+ccflags-y += -Wno-date-time
+
+# API selection
+ifneq ($$(CONFIG_CFG80211),)
+  ccflags-y += -DUSE_CFG80211
+else
+  ccflags-y += -DUSE_IW
+endif
+
+obj-$$(CONFIG_WLAN_VENDOR_BROADCOM_WL) += wl.o
+
+wl-objs := src/shared/linux_osl.o
+wl-objs += src/wl/sys/wl_linux.o
+wl-objs += src/wl/sys/wl_iw.o
+wl-objs += src/wl/sys/wl_cfg80211_hybrid.o
+wl-objs += lib/wlc_hybrid.o_shipped
+MAKEFILE_EOF
+          echo 'Makefile replaced with fixed version'
         else
           echo 'ERROR: /drivers/broadcom-wl not found!'
           ls -la /drivers/
