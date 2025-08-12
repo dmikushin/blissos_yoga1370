@@ -79,8 +79,9 @@ RUN mkdir -p /kernel-source /kernel-build
 
 WORKDIR /kernel-build
 
-# Build script
+# Build scripts
 COPY build-kernel.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/build-kernel.sh
+COPY install-broadcom-driver.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/build-kernel.sh /usr/local/bin/install-broadcom-driver.sh
 
 CMD ["/usr/local/bin/build-kernel.sh"]
