@@ -45,32 +45,45 @@ cp /kernel-source/drivers/net/wireless/broadcom-wl/lib/wlc_hybrid.o_shipped \
 echo "Checking header files..."
 ls -la /kernel-source/drivers/net/wireless/broadcom-wl/src/include/typedefs.h || echo "WARNING: typedefs.h not found!"
 
-# FIX: Change angle brackets to quotes in source files
-echo "Fixing include statements in source files..."
-find /kernel-source/drivers/net/wireless/broadcom-wl/src -name "*.c" -exec sed -i 's/#include <typedefs\.h>/#include "typedefs.h"/g' {} \;
-find /kernel-source/drivers/net/wireless/broadcom-wl/src -name "*.c" -exec sed -i 's/#include <bcmutils\.h>/#include "bcmutils.h"/g' {} \;
-find /kernel-source/drivers/net/wireless/broadcom-wl/src -name "*.c" -exec sed -i 's/#include <linux_osl\.h>/#include "linux_osl.h"/g' {} \;
-find /kernel-source/drivers/net/wireless/broadcom-wl/src -name "*.c" -exec sed -i 's/#include <linuxver\.h>/#include "linuxver.h"/g' {} \;
-find /kernel-source/drivers/net/wireless/broadcom-wl/src -name "*.c" -exec sed -i 's/#include <osl\.h>/#include "osl.h"/g' {} \;
-find /kernel-source/drivers/net/wireless/broadcom-wl/src -name "*.c" -exec sed -i 's/#include <bcmdefs\.h>/#include "bcmdefs.h"/g' {} \;
-find /kernel-source/drivers/net/wireless/broadcom-wl/src -name "*.c" -exec sed -i 's/#include <bcmdevs\.h>/#include "bcmdevs.h"/g' {} \;
-find /kernel-source/drivers/net/wireless/broadcom-wl/src -name "*.c" -exec sed -i 's/#include <pcicfg\.h>/#include "pcicfg.h"/g' {} \;
+# NUCLEAR OPTION: Copy all headers to the same directories as .c files
+echo "Copying headers to source directories..."
+
+# Copy headers to shared directory where linux_osl.c is
+cp /kernel-source/drivers/net/wireless/broadcom-wl/src/include/*.h \
+   /kernel-source/drivers/net/wireless/broadcom-wl/src/shared/ 2>/dev/null || true
+
+# Copy headers to wl/sys directory where other .c files are
+cp /kernel-source/drivers/net/wireless/broadcom-wl/src/include/*.h \
+   /kernel-source/drivers/net/wireless/broadcom-wl/src/wl/sys/ 2>/dev/null || true
+
+# Also copy common includes if they exist
+if [ -d /kernel-source/drivers/net/wireless/broadcom-wl/src/common/include ]; then
+    cp /kernel-source/drivers/net/wireless/broadcom-wl/src/common/include/*.h \
+       /kernel-source/drivers/net/wireless/broadcom-wl/src/shared/ 2>/dev/null || true
+    cp /kernel-source/drivers/net/wireless/broadcom-wl/src/common/include/*.h \
+       /kernel-source/drivers/net/wireless/broadcom-wl/src/wl/sys/ 2>/dev/null || true
+fi
+
+echo "Headers copied to source directories"
+
+# Also fix include statements to use quotes instead of angle brackets
+echo "Fixing include statements..."
+find /kernel-source/drivers/net/wireless/broadcom-wl/src -name "*.c" -exec sed -i 's/#include <\([^>]*\)>/#include "\1"/g' {} \;
 echo "Include statements fixed"
 
-# Create simplified Makefile with correct include paths
-echo "Creating fixed Makefile..."
+# Create simplified Makefile - headers are now in same dirs as sources
+echo "Creating simplified Makefile..."
 cat > /kernel-source/drivers/net/wireless/broadcom-wl/Makefile << 'EOF'
 # Simplified Makefile for in-kernel build
-# Include paths MUST be first - using both -I and -isystem for compatibility
-ccflags-y := -I$(src)/src/include
-ccflags-y += -isystem $(src)/src/include
-ccflags-y += -I$(src)/src/common/include
+# Headers are now copied to source directories, so simple paths work
+ccflags-y := -I$(src)/src/shared
 ccflags-y += -I$(src)/src/wl/sys
-ccflags-y += -I$(src)/src/wl/phy
-ccflags-y += -I$(src)/src/wl/ppr/include
+ccflags-y += -I$(src)/src/include
+ccflags-y += -I$(src)/src/common/include
 ccflags-y += -I$(src)/src/shared/bcmwifi/include
 ccflags-y += -Wno-date-time
 ccflags-y += -D__KERNEL__
+ccflags-y += -DLINUX
 
 # API selection
 ifneq ($(CONFIG_CFG80211),)
