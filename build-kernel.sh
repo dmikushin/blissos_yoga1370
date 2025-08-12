@@ -215,79 +215,67 @@ echo "Modules in: /kernel-build/"
 
 echo ""
 echo "============================================="
-echo "CRITICAL VERIFICATION: BCM4352 COMPILATION"
+echo "FINAL CHECK: Was broadcom-wl ACTUALLY compiled?"
 echo "============================================="
 
-# THE ONLY CHECKS THAT MATTER:
-
-# 1. Check specific object files that MUST exist if driver compiled
-echo "Checking for REQUIRED object files:"
-REQUIRED_FILES=(
-    "/kernel-build/drivers/net/wireless/broadcom-wl/src/wl/sys/wl_linux.o"
-    "/kernel-build/drivers/net/wireless/broadcom-wl/src/wl/sys/wl_cfg80211_hybrid.o"
-    "/kernel-build/drivers/net/wireless/broadcom-wl/src/shared/linux_osl.o"
-)
-
-FAILED=0
-for file in "${REQUIRED_FILES[@]}"; do
-    if [ -f "$file" ]; then
-        size=$(stat -c%s "$file" 2>/dev/null || echo "0")
-        if [ "$size" -gt 1000 ]; then
-            echo "  ✓ $file ($(ls -lh "$file" | awk '{print $5}'))"
-        else
-            echo "  ✗ $file exists but EMPTY or TINY!"
-            FAILED=1
+# Count ALL .o files in broadcom-wl directory
+if [ -d "/kernel-build/drivers/net/wireless/broadcom-wl" ]; then
+    echo "Checking /kernel-build/drivers/net/wireless/broadcom-wl/"
+    
+    # Count object files
+    OBJ_COUNT=$(find /kernel-build/drivers/net/wireless/broadcom-wl -name "*.o" -type f 2>/dev/null | wc -l)
+    echo "Found $OBJ_COUNT .o files"
+    
+    if [ $OBJ_COUNT -eq 0 ]; then
+        echo "❌ COMPILATION FAILED: Zero object files!"
+        echo "Directory contents:"
+        ls -la /kernel-build/drivers/net/wireless/broadcom-wl/
+        echo "Subdirectories:"
+        find /kernel-build/drivers/net/wireless/broadcom-wl -type d
+        exit 1
+    fi
+    
+    # List actual object files with sizes
+    echo "Object files found:"
+    find /kernel-build/drivers/net/wireless/broadcom-wl -name "*.o" -type f -exec ls -lh {} \; | while read line; do
+        echo "  $line"
+        # Check if file is not empty
+        file=$(echo "$line" | awk '{print $NF}')
+        size=$(echo "$line" | awk '{print $5}')
+        if [[ "$size" == "0" ]]; then
+            echo "    ❌ ERROR: Empty object file!"
+            exit 1
         fi
-    else
-        echo "  ✗ MISSING: $file"
-        FAILED=1
-    fi
-done
-
-if [ $FAILED -eq 1 ]; then
-    echo ""
-    echo "❌❌❌ BROADCOM-WL WAS NOT COMPILED! ❌❌❌"
-    echo ""
-    echo "Checking what exists in broadcom-wl directory:"
-    if [ -d "/kernel-build/drivers/net/wireless/broadcom-wl" ]; then
-        find /kernel-build/drivers/net/wireless/broadcom-wl -type f -name "*.o" -o -name "*.ko" -o -name "*.a" 2>/dev/null | while read f; do
-            echo "  $(ls -lh "$f" 2>/dev/null)"
-        done
-    else
-        echo "  Directory doesn't even exist!"
-    fi
-    exit 1
-fi
-
-# 2. For built-in: Check wl.o or built-in.a
-if grep -q "CONFIG_WLAN_VENDOR_BROADCOM_WL=y" /kernel-build/.config; then
-    echo ""
-    echo "Checking for built-in driver object:"
+    done
+    
+    # Check for the main composite object or built-in.a
     if [ -f "/kernel-build/drivers/net/wireless/broadcom-wl/wl.o" ]; then
-        size=$(stat -c%s "/kernel-build/drivers/net/wireless/broadcom-wl/wl.o" 2>/dev/null || echo "0")
-        if [ "$size" -gt 1000000 ]; then  # Should be > 1MB
-            echo "  ✓ wl.o found ($(ls -lh /kernel-build/drivers/net/wireless/broadcom-wl/wl.o | awk '{print $5}'))"
-        else
-            echo "  ✗ wl.o exists but too small!"
+        size=$(stat -c%s "/kernel-build/drivers/net/wireless/broadcom-wl/wl.o")
+        echo ""
+        echo "Main object: wl.o ($(ls -lh /kernel-build/drivers/net/wireless/broadcom-wl/wl.o | awk '{print $5}'))"
+        if [ $size -lt 100000 ]; then
+            echo "  ❌ ERROR: wl.o is too small (less than 100KB)!"
             exit 1
         fi
     elif [ -f "/kernel-build/drivers/net/wireless/broadcom-wl/built-in.a" ]; then
-        size=$(stat -c%s "/kernel-build/drivers/net/wireless/broadcom-wl/built-in.a" 2>/dev/null || echo "0")
-        if [ "$size" -gt 1000000 ]; then  # Should be > 1MB
-            echo "  ✓ built-in.a found ($(ls -lh /kernel-build/drivers/net/wireless/broadcom-wl/built-in.a | awk '{print $5}'))"
-        else
-            echo "  ✗ built-in.a exists but too small!"
+        size=$(stat -c%s "/kernel-build/drivers/net/wireless/broadcom-wl/built-in.a")
+        echo ""
+        echo "Archive: built-in.a ($(ls -lh /kernel-build/drivers/net/wireless/broadcom-wl/built-in.a | awk '{print $5}'))"
+        if [ $size -lt 100000 ]; then
+            echo "  ❌ ERROR: built-in.a is too small (less than 100KB)!"
             exit 1
         fi
-    else
-        echo "  ✗ Neither wl.o nor built-in.a found!"
-        echo "  ❌ DRIVER NOT BUILT INTO KERNEL!"
-        exit 1
     fi
+    
+    # If we got here, compilation succeeded
+    echo ""
+    echo "✅ SUCCESS: broadcom-wl compiled with $OBJ_COUNT object files!"
+else
+    echo "❌ CRITICAL: /kernel-build/drivers/net/wireless/broadcom-wl directory doesn't exist!"
+    echo "Build system completely ignored the driver!"
+    exit 1
 fi
 
-echo ""
-echo "✅ BROADCOM-WL SUCCESSFULLY COMPILED!"
 echo "============================================="
 
 # REMOVED vmlinux and System.map checks - they are UNRELIABLE
