@@ -2,6 +2,7 @@
 set -e
 
 echo "Starting kernel build for BlissOS 6.9.9-zenith"
+echo "Build log will be saved to: /kernel-build/logs/build-*.log"
 
 # Check if source exists
 if [ ! -f "/kernel-source/Makefile" ]; then
@@ -280,3 +281,8 @@ echo "============================================="
 
 # REMOVED vmlinux and System.map checks - they are UNRELIABLE
 
+echo ""
+echo "=== Build Complete ==="
+echo "Log files saved in: /kernel-build/logs/"
+ls -lh /kernel-build/logs/*.log 2>/dev/null || echo "No log files found"
+echo ""

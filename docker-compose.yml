@@ -26,7 +26,7 @@ services:
       - KBUILD_BUILD_HOST=orion
       # Parallel jobs
       - JOBS=8
-    command: sh -c "/usr/local/bin/install-broadcom-driver.sh && /usr/local/bin/build-kernel.sh"
+    command: sh -c "mkdir -p /kernel-build/logs && (/usr/local/bin/install-broadcom-driver.sh && /usr/local/bin/build-kernel.sh) 2>&1 | tee /kernel-build/logs/build-$(date +%Y%m%d-%H%M%S).log"
     networks:
       - build-network
 
