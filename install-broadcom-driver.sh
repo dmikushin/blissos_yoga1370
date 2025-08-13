@@ -66,9 +66,9 @@ fi
 
 echo "Headers copied to source directories"
 
-# Also fix include statements to use quotes instead of angle brackets
-echo "Fixing include statements..."
-find /kernel-source/drivers/net/wireless/broadcom-wl/src -name "*.c" -exec sed -i 's/#include <\([^>]*\)>/#include "\1"/g' {} \;
+# Fix include statements to use quotes instead of angle brackets in ALL files
+echo "Fixing include statements in all source and header files..."
+find /kernel-source/drivers/net/wireless/broadcom-wl/src -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's/#include <\([^>]*\)>/#include "\1"/g' {} \;
 echo "Include statements fixed"
 
 # Create simplified Makefile - headers are now in same dirs as sources
