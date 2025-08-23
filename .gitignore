@@ -17,7 +17,10 @@ modules.order
 # System images and extracted files
 system_*/
 system.efs
+system_new.efs
+*.efs
 system.img
+*.img
 initrd_check/
 new_system/
 
